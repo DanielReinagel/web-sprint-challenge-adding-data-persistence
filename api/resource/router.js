@@ -3,14 +3,20 @@ const express = require("express");
 const model = require("./model");
 
 
-const checkBody = (req, res, next) => { //TODO, check if resource_name is unique
+const checkBody = async (req, res, next) => {
   const { resource_name, resource_description } = req.body;
   if(!resource_name) res.status(400).json({message:"You must provide a resource name"});
   else {
-    const p = {}; req.payload = p;
-    p.resource_name = resource_name;
-    if(resource_description) p.resource_description = resource_description;
-    next();
+    let unique = true; let error = false;
+    await model.getAll().then(resources => unique = resources.reduce((acc, r) => acc&&r.resource_name!==resource_name, true))
+      .catch(err => {unique=false; error=true; res.status(500).json({shortHand:"error getting resources from database", message:err.message, stack:err.stack, error:err});}); //On one line because this line of code should never be run and should generally be ignored.
+    
+    if(unique){
+      const p = {}; req.payload = p;
+      p.resource_name = resource_name;
+      if(resource_description) p.resource_description = resource_description;
+      next();
+    } else if(!error) res.status(400).json({message:"That resource name is already taken"});
   }
 }
 
